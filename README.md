@@ -239,3 +239,8 @@ English is the primary documentation language. Each document links to a correspo
 - **0.1.2:** Preserve pending captions and add size/reading-time settings.
 - **0.1.1:** Retry overlay initialization and add Test overlay.
 - **0.1.0:** Initial captions, comment translation and back-translation proof of concept.
+
+
+### Captions without translation
+
+In Settings, select **Captions → Caption mode → Transcription only (no translation)**, save, then press **Start captions** in the main panel. Only a speech recognition API key is required. Interim and final speech appear in the original language; caption translation requests are skipped. Speech recognition service charges and limits still apply. Comment translation and re-MTL remain separate and require a translation API key.

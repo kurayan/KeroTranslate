@@ -42,3 +42,21 @@ test('caption failures shed new work during cooldown then recover with new speec
     message({type:'STOP'});await speech(7);assert.equal(requests,4);
   }finally{message({type:'STOP'});Date.now=originalNow;globalThis.WebSocket=originalSocket;chrome.runtime.sendMessage=send;}
 });
+
+test('transcription-only captions publish partial and final speech without translation requests',async()=>{
+  const originalSocket=globalThis.WebSocket;let socket;
+  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{mediaDevices:{async getUserMedia(){return {getTracks:()=>[{stop(){}}]};}}}});
+  globalThis.WebSocket=class{readyState=1;bufferedAmount=0;constructor(){socket=this;queueMicrotask(()=>this.onopen?.());}send(){}close(){}};
+  const start=sent.length;
+  try{
+    message({type:'START',id:'transcription-only',streamId:'fake',settings:{...config,captionMode:'original'}});await turn();
+    for(const final of [false,true]){
+      socket.onmessage({data:JSON.stringify({type:'Results',start:0,is_final:final,channel:{alternatives:[{transcript:final?'Hello world':'Hello'}]}})});await turn();
+    }
+    const events=sent.slice(start),cues=events.filter(m=>m.type==='AUDIO_CUE').map(m=>m.cue);
+    assert.ok(cues.some(c=>c.phase==='partial'&&c.original==='Hello'));
+    assert.ok(cues.some(c=>c.phase==='final'&&c.original==='Hello world'));
+    assert.ok(cues.every(c=>c.translation===''&&c.pending===false));
+    assert.equal(events.filter(m=>m.type==='CAPTION_TRANSLATE').length,0);
+  }finally{message({type:'STOP'});globalThis.WebSocket=originalSocket;}
+});
