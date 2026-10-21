@@ -240,3 +240,8 @@ node tools/check.js
 ### 翻訳なしで文字起こしだけ表示する
 
 設定画面の **Captions → Caption mode → Transcription only (no translation)** を選んで保存し、メインパネルで **Start captions** を押してください。音声認識のAPIキーだけで使えます。認識途中の原文も表示し、字幕の翻訳APIは呼びません。音声認識サービスの料金・制限は引き続き適用されます。コメントの翻訳・re-MTLを使う場合は翻訳APIキーが別途必要です。
+
+
+### 0.2.3 — 2026-10-21
+
+拡張機能の表示名を「Kero Translate - YouTube Live Translation & Comment Assist」に更新しました。ツールバーは余白の少ないカエルの元画像を使用します。APIキー取得ガイドと、翻訳なしの文字起こしモードの案内も設定画面から利用できます。

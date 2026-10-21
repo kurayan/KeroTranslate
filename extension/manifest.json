@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "KeroTranslate",
-  "version": "0.2.0",
-  "version_name": "0.2",
+  "name": "Kero Translate - YouTube Live Translation & Comment Assist",
+  "version": "0.2.3",
+  "version_name": "0.2.3",
   "minimum_chrome_version": "116",
   "description": "EN / JA captions and comment drafting. INSERT never sends.",
   "permissions": [
@@ -26,7 +26,8 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "KeroTranslate"
+    "default_title": "KeroTranslate",
+    "default_icon": "assets/kero-frog.png"
   },
   "options_page": "options.html",
   "content_scripts": [
@@ -56,5 +57,6 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://generativelanguage.googleapis.com wss://api.deepgram.com https://api.openai.com https://api.deepseek.com https://api.deepl.com https://api-free.deepl.com wss://api.deepl.com"
-  }
+  },
+  "short_name": "Kero Translate"
 }

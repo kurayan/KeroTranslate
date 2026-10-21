@@ -244,3 +244,8 @@ English is the primary documentation language. Each document links to a correspo
 ### Captions without translation
 
 In Settings, select **Captions → Caption mode → Transcription only (no translation)**, save, then press **Start captions** in the main panel. Only a speech recognition API key is required. Interim and final speech appear in the original language; caption translation requests are skipped. Speech recognition service charges and limits still apply. Comment translation and re-MTL remain separate and require a translation API key.
+
+
+### 0.2.3 — 2026-10-21
+
+Updated the extension name to “Kero Translate - YouTube Live Translation & Comment Assist”. The toolbar now uses the original frog image without the extra store-icon padding. Settings also include API key setup guide links and clearer guidance for transcription-only captions.
