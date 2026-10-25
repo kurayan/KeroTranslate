@@ -1,6 +1,18 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mountComposer} from '../extension/ui/composer-view.js';
 import {DEFAULTS} from '../extension/core/settings.js';
+test('theme changes preserve drafts, active translation and capture; failed saves roll back',async t=>{
+  const node=()=>({style:{},dataset:{},value:'',textContent:'',classList:{add(){},remove(){},toggle(){}},addEventListener(){},prepend(){},setAttribute(k,v){this[k]=v;}});
+  const nodes=new Map(),query=k=>{if(!nodes.has(k))nodes.set(k,node());return nodes.get(k);};
+  globalThis.document={createElement:()=>({...node(),querySelector:query})};t.after(()=>delete globalThis.document);
+  let result={ok:true,panelTheme:'light'};const calls=[];
+  const view=mountComposer({attachShadow:()=>({querySelector:query}),remove(){}},{settings:DEFAULTS,translateBatch:()=>new Promise(()=>{}),insert:async()=>({}),themeAction:async theme=>{calls.push(theme);return result;}});
+  view.state.state.original='keep my words';view.state.run();const controller=view.state.controller,revision=view.state.revision;
+  assert.equal(query('.panel').dataset.theme,'dark');query('.theme').value='light';await query('.theme').onchange();
+  assert.deepEqual(calls,['light']);assert.equal(query('.panel').dataset.theme,'light');assert.equal(view.state.state.original,'keep my words');assert.equal(view.state.revision,revision);assert.equal(controller.signal.aborted,false);
+  result={ok:false,error:'Save failed'};query('.theme').value='dark';await query('.theme').onchange();assert.equal(query('.theme').value,'light');assert.equal(query('.panel').dataset.theme,'light');assert.equal(query('.theme').disabled,false);
+  view.refreshTheme('dark');assert.equal(query('.panel').dataset.theme,'dark');assert.equal(view.state.revision,revision);view.dispose();
+});
 test('main panel starts and stops captions, reflects broadcast status and displays capture errors',async t=>{
   const node=()=>({style:{},dataset:{},value:'',textContent:'',classList:{add(){},remove(){},toggle(){}},addEventListener(){},prepend(){},setAttribute(key,value){this[key]=value;}});
   const rootNodes=new Map(),controlNodes=new Map();
@@ -52,4 +64,18 @@ test('minimizing preserves the live composer and Retry all stays available while
   const phase=view.state.state.phase;query('.minimize').onclick();assert.equal(query('.body').hidden,true);assert.equal(query('.comment-progress').hidden,false);assert.equal(query('.foot').hidden,true);assert.equal(query('.minimize')['aria-expanded'],'false');assert.equal(calls[0].request.signal.aborted,false);assert.equal(view.state.state.phase,phase);
   query('.minimize').onclick();assert.equal(query('.body').hidden,false);assert.equal(view.state.state.original,'keep this');
   const retry=query('.retry').onclick();assert.equal(calls[0].request.signal.aborted,true);calls[0].resolve({mtl:'stale',back:'stale'});calls[1].resolve({mtl:'current',back:'checked'});await first;await retry;assert.equal(view.state.state.mtl,'current');assert.equal(query('.comment-progress').hidden,true);view.state.state.phase='ERROR';view.state.emit();assert.equal(query('.comment-progress').hidden,true);view.connectionLost('Reload this YouTube page');assert.equal(view.state.state.original,'keep this');assert.equal(query('#original').readOnly,true);assert.equal(query('.retry').disabled,true);assert.equal(query('.comment-progress').hidden,true);assert.equal(view.state.disposed,true);view.dispose();
+});
+
+test('caption-only panel omits composer and keeps capture, timing, theme and minimize controls',async t=>{
+ const node=()=>({style:{},dataset:{},value:'',textContent:'',remove(){this.removed=true;},prepend(){},setAttribute(k,v){this[k]=v;}});
+ const nodes=new Map(),query=k=>{if(!nodes.has(k))nodes.set(k,node());return nodes.get(k);};
+ globalThis.document={createElement:()=>({...node(),querySelector:query})};t.after(()=>delete globalThis.document);
+ const actions=[];const view=mountComposer({attachShadow:()=>({querySelector:query}),remove(){}},{settings:DEFAULTS,captionsOnly:true,captureAction:async a=>{actions.push(a);return {ok:true,status:a==='start'?'LISTENING':'STOPPED'};},timingAction:async timings=>({ok:true,timings}),themeAction:async panelTheme=>({ok:true,panelTheme})});
+ assert.equal(view.state,undefined);assert.doesNotMatch(query('.body').innerHTML,/textarea|INSERT|re-MTL/);assert.equal(query('.progress-track').removed,true);
+ await query('.capture-start').onclick();assert.equal(query('.capture-state').textContent,'LISTENING');
+ await query('.capture-stop').onclick();assert.deepEqual(actions,['start','stop']);
+ query('.request-gap').value='2000';await query('.request-gap').onchange();assert.equal(query('.request-gap').value,'2000');
+ query('.theme').value='light';await query('.theme').onchange();assert.equal(query('.panel').dataset.theme,'light');
+ query('.minimize').onclick();assert.equal(query('.body').hidden,true);query('.minimize').onclick();assert.equal(query('.body').hidden,false);
+ view.connectionLost('Reload');assert.equal(query('.capture-start').disabled,true);view.dispose();
 });

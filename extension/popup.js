@@ -33,6 +33,6 @@ async function control(type){
 q('start').onclick=()=>control('START_CAPTURE');q('stop').onclick=()=>control('STOP_CAPTURE');
 q('test').onclick=async()=>{try{const r=await chrome.runtime.sendMessage({type:'TEST_OVERLAY',tabId});message.set(r.ok?'Test caption shown. No audio or API request.':r.error,!r.ok);}catch{message.set('Reload this YouTube page and try again.',true);}};
 q('settings').onclick=()=>chrome.runtime.openOptionsPage();render();
-if(!validTab)message.set('Open a YouTube Live watch tab, then open this toolbar icon there.');
+if(!validTab)message.set('Open a YouTube watch tab, then open this toolbar icon there.');
 await refresh().catch(()=>{message.set('Could not load status. Reopen this popup.',true);});
 setInterval(()=>{if(!busy)refresh().catch(()=>{});},1500);

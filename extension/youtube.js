@@ -20,9 +20,9 @@ export function insertDraft(text,{replace=false,expected}={},doc=document){
   if(input.textContent!==text)throw new Error('Check the YouTube input: insertion could not be verified.');
   return {message:'Inserted. Review and send in YouTube.'};
 }
-export function livePlayer(doc=document){
+export function watchPlayer(doc=document){
   if(doc.location.pathname!=='/watch')return null;
   const player=doc.querySelector('#movie_player'),video=player?.querySelector('video');
   const badge=player?.querySelector('.ytp-live-badge');
-  return player&&video&&(video.duration===Infinity||badge?.getClientRects().length)?player:null;
+  return player&&video&&(video.duration===Infinity||badge?.getClientRects().length||(Number.isFinite(video.duration)&&video.duration>0))?player:null;
 }

@@ -12,7 +12,25 @@ Follow a stream with original and translated captions. Draft a comment, translat
 
 **INSERT only fills the chat input. It never sends a message. You review and post it yourself.**
 
-Current version: **Beta 0.2** (October 9, 2026).
+Current version: **Beta 0.5.1** (October 25, 2026).
+
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/mkpjddfijhnmgnjelchaameoknomplel), or load this repository’s `extension/` folder in Developer mode. The v0.2.0-beta release link below is an older build.
+
+## Panel theme
+
+Use **Dark / Light** in the main panel header to switch its appearance. Dark is the default. Your choice is saved in this Chrome profile and survives reloads and browser restarts. You can also select it under **Settings → 03 / Panel appearance**.
+
+Switching from the main panel preserves comment drafts, pending translations and audio capture. Saving the full Settings form still stops capture as before. The theme applies only to the Kero comment panel; it does not change the caption overlay, YouTube colors or fullscreen behavior.
+
+In a tested setup with Ambient light for YouTube, fullscreen chat text became unreadable. Disabling that extension and reloading restored readable chat. Kero does not override other extensions’ page colors.
+
+
+## Captions for archived streams
+
+Captions now work on regular YouTube watch pages (`/watch`), including archived streams. Play the video and press **Start captions** in the Kero toolbar popup. Chat replay shows a caption-only panel with **Start captions / Stop**, **Request gap**, **Caption hold**, theme selection and minimize. It has no comment input, MTL, re-MTL or INSERT. First capture on a tab may still require Start captions in the toolbar popup (Chrome permission requirement). If chat replay is unavailable, use the popup.
+
+Recognition processes the audio currently playing in the tab; this is not a whole-video transcription or subtitle-file download. Choose **Original only** for transcription or **Original + MTL** for translated captions. Seeking or reaching the end stops caption processing to prevent old translations appearing at the new position. Press **Start captions** again after seeking. Pausing alone does not close the session; use **Stop** for longer breaks.
+
 
 ## Install the beta
 
@@ -75,7 +93,7 @@ The adapters added in 0.1.6 remain experimental: their request/response handling
 - Start the reading timer after translation arrives. Keep the caption while the next translation is pending; replace it when the new translation arrives.
 - When translation falls behind, finish the active segment and keep only the newest waiting segment. Intermediate segments can be skipped; this is not a complete transcript recorder.
 
-Under **Settings → 03 / Captions**:
+Under **Settings → 04 / Captions**:
 
 | Setting | Choices / default |
 |---|---|
@@ -245,6 +263,13 @@ English is the primary documentation language. Each document links to a correspo
 
 In Settings, select **Captions → Caption mode → Transcription only (no translation)**, save, then press **Start captions** in the main panel. Only a speech recognition API key is required. Interim and final speech appear in the original language; caption translation requests are skipped. Speech recognition service charges and limits still apply. Comment translation and re-MTL remain separate and require a translation API key.
 
+
+### 0.5.1 — 2026-10-25
+
+- Added archived-video transcription and translated captions, plus caption-only controls in chat replay.
+- Seeking and playback end stop caption processing and discard stale captions.
+- Includes the persistent dark/light panel themes introduced in 0.5.
+- Public-build API key storage is unchanged and differs from the encrypted store build.
 
 ### 0.2.3 — 2026-10-21
 

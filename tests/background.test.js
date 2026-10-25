@@ -182,3 +182,20 @@ test('delayed or failed progress delivery never blocks paced back-translation', 
     assert.equal(edited.ok,true);assert.equal(starts.length,3);
   }finally{globalThis.fetch=oldFetch;chrome.tabs.sendMessage=send;data.local.settings={};}
 });
+
+test('playback reset only stops capture for the originating top-level watch tab',async()=>{
+ data.session.capture={id:'archive',tabId:42};
+ await message({type:'PLAYBACK_RESET'},content);assert.equal(data.session.capture.id,'archive');
+ await message({type:'PLAYBACK_RESET'},{...content,frameId:0,url:'https://www.youtube.com/watch?v=archive',tab:{id:99}});assert.equal(data.session.capture.id,'archive');
+ await message({type:'PLAYBACK_RESET'},{...content,frameId:0,url:'https://www.youtube.com/watch?v=archive'});assert.equal(data.session.capture,undefined);
+});
+
+test('replay frames can adjust caption controls but cannot translate comments or access keys',async()=>{
+ const replay={...content,url:'https://www.youtube.com/live_chat_replay?v=test'};
+ assert.equal((await message({type:'PANEL_STATUS'},replay)).ok,true);
+ assert.equal((await message({type:'PANEL_TIMING',timings:{captionDuration:10}},replay)).ok,true);
+ assert.equal((await message({type:'PANEL_THEME',panelTheme:'light'},replay)).ok,true);
+ assert.equal((await message({type:'TRANSLATE_COMMENT',id:'replay',request:{}},replay)).ok,false);
+ assert.equal((await message({type:'PRIVATE_CONFIG'},replay)).ok,false);
+ data.session.capture={id:'replay',tabId:42};assert.equal((await message({type:'PANEL_STOP'},replay)).ok,true);assert.equal(data.session.capture,undefined);
+});

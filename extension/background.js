@@ -6,7 +6,7 @@ const translations=new TranslationQueue(),captionPending=new Map();
 const pending=new Map();let lifecycle=Promise.resolve();
 const ready=initializeKeyStorage(chrome.storage);
 const trusted=sender=>sender.id===chrome.runtime.id&&sender.url?.startsWith(chrome.runtime.getURL(''));
-const youtube=sender=>sender.id===chrome.runtime.id&&sender.tab&&/^https:\/\/www\.youtube\.com\/(watch|live_chat)(\?|$|\/)/.test(sender.url||'');
+const youtube=sender=>sender.id===chrome.runtime.id&&sender.tab&&/^https:\/\/www\.youtube\.com\/(watch|live_chat|live_chat_replay)(\?|$|\/)/.test(sender.url||'');
 const ns=(sender,id)=>`${sender.tab?.id}:${sender.frameId}:${id}`;
 async function settings(){await ready;return sanitizeSettings((await chrome.storage.local.get('settings')).settings);}
 async function capture(){return (await chrome.storage.session.get('capture')).capture;}
@@ -24,7 +24,7 @@ async function stop(){
 }
 async function start(tabId){
   await stop();const tab=await chrome.tabs.get(tabId);
-  if(!/^https:\/\/www\.youtube\.com\/watch\?/.test(tab.url||''))throw new Error('Open a YouTube Live watch page first.');
+  if(!/^https:\/\/www\.youtube\.com\/watch\?/.test(tab.url||''))throw new Error('Open a YouTube watch page first.');
   let check;
   for(let attempt=0;attempt<3;attempt++){
     check=await chrome.tabs.sendMessage(tabId,{type:'CHECK_LIVE'},{frameId:0}).catch(()=>null);
@@ -32,7 +32,7 @@ async function start(tabId){
     if(attempt<2)await new Promise(resolve=>setTimeout(resolve,150));
   }
   if(!check)throw new Error('KeroTranslate is not connected to this page. Reload YouTube once after updating the extension, then start from the toolbar popup.');
-  if(!check.live)throw new Error('A live player is not ready. Wait for the live video to load, then try Start captions again.');
+  if(!check.live)throw new Error('The video player is not ready. Play the video, then try Start captions again.');
   if(!check.overlayReady)throw new Error(check.error||'Caption overlay is unavailable. Reload this YouTube page.');
   const config=await settings();const keys=(await chrome.storage.local.get('keys')).keys||{};
   const names={deepgram:'Deepgram',gemini:'Gemini',openai:'OpenAI',deepl:'DeepL',deepseek:'DeepSeek'};
@@ -57,14 +57,23 @@ async function handle(m,sender){
   if(m.type==='CONFIG')return {settings:await settings()};
   if(m.type==='OPEN_SETTINGS'){await chrome.runtime.openOptionsPage();return {};}
   if(['PANEL_START','PANEL_STOP','PANEL_STATUS'].includes(m.type)){
-    if(!youtube(sender)||!/^https:\/\/www\.youtube\.com\/live_chat(?:\?|$|\/)/.test(sender.url))throw new Error('Open the live chat panel.');
+    if(!youtube(sender)||!/^https:\/\/www\.youtube\.com\/live_chat(?:_replay)?(?:\?|$|\/)/.test(sender.url))throw new Error('Open the live chat panel.');
     const tabId=sender.tab.id;
     if(m.type==='PANEL_START')await serial(()=>start(tabId));
     if(m.type==='PANEL_STOP')await serial(async()=>{if((await capture())?.tabId===tabId)await stop();});
     const c=await capture();return {status:c?.tabId===tabId?c.status:'STOPPED',error:c?.tabId===tabId?c.error||'':''};
   }
+  if(m.type==='PANEL_THEME'){
+    if(!youtube(sender)||!/^https:\/\/www\.youtube\.com\/live_chat(?:_replay)?(?:\?|$|\/)/.test(sender.url))throw new Error('Open the live chat panel.');
+    if(!['dark','light'].includes(m.panelTheme))throw new Error('Unsupported panel theme.');
+    return serial(async()=>{
+      const config={...await settings(),panelTheme:m.panelTheme};await chrome.storage.local.set({settings:config});
+      for(const tab of await chrome.tabs.query({url:'https://www.youtube.com/*'}))await broadcast(tab.id,{type:'THEME_CHANGED',panelTheme:config.panelTheme});
+      return {panelTheme:config.panelTheme};
+    });
+  }
   if(m.type==='PANEL_TIMING'){
-    if(!youtube(sender)||!/^https:\/\/www\.youtube\.com\/live_chat(?:\?|$|\/)/.test(sender.url))throw new Error('Open the live chat panel.');
+    if(!youtube(sender)||!/^https:\/\/www\.youtube\.com\/live_chat(?:_replay)?(?:\?|$|\/)/.test(sender.url))throw new Error('Open the live chat panel.');
     const choices={translationInterval:[500,1000,2000,4000,6000,12000],captionDuration:[5,7,10,15,20]};
     if(!m.timings||typeof m.timings!=='object'||Array.isArray(m.timings)||!Object.keys(m.timings).length||Object.entries(m.timings).some(([key,value])=>!Object.hasOwn(choices,key)||!choices[key].includes(value)))throw new Error('Unsupported timing setting.');
     return serial(async()=>{
@@ -75,7 +84,7 @@ async function handle(m,sender){
       return {timings};
     });
   }
-  if(m.type==='NAVIGATED'){
+  if(m.type==='NAVIGATED'||m.type==='PLAYBACK_RESET'){
     for(const [key,item]of pending)if(key.startsWith(`${sender.tab?.id}:${sender.frameId}:`)){item.abort();pending.delete(key);}
     const c=await capture();if(sender.frameId===0&&c?.tabId===sender.tab?.id)await serial(stop);return {};
   }

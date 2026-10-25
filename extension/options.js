@@ -1,4 +1,4 @@
-const fields=['sttProvider','translationProvider','model','openaiModel','deepseekModel','deeplPlan','translationInterval','source','speechLanguage','captionTarget','captionMode','captionLines','captionPosition','captionSize','captionDuration'];
+const fields=['panelTheme','sttProvider','translationProvider','model','openaiModel','deepseekModel','deeplPlan','translationInterval','source','speechLanguage','captionTarget','captionMode','captionLines','captionPosition','captionSize','captionDuration'];
 const keyNames=['gemini','deepgram','openai','deepl','deepseek'];
 const q=id=>document.getElementById(id);
 const result=await chrome.runtime.sendMessage({type:'PRIVATE_CONFIG'});
@@ -19,5 +19,5 @@ q('clear').onclick=async()=>{const r=await chrome.runtime.sendMessage({type:'CLE
 chrome.storage.onChanged.addListener((changes,area)=>{
   if(area!=='local'||!changes.settings?.newValue)return;
   const {oldValue={},newValue}=changes.settings;
-  for(const field of ['translationInterval','captionDuration'])if(newValue[field]!==oldValue[field])q(field).value=newValue[field];
+  for(const field of ['translationInterval','captionDuration','panelTheme'])if(newValue[field]!==oldValue[field])q(field).value=newValue[field];
 });

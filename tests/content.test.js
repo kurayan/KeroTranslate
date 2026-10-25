@@ -4,12 +4,13 @@ import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 const source=(await readFile(new URL('../extension/content.js',import.meta.url),'utf8')).replace(/import\(chrome.runtime.getURL\('([^']+)'\)\)/g,(_,path)=>`Promise.resolve(modules['${path}'])`);
 async function harness({path='/watch',config,failView=false,failures=0}={}){
+  const videoEvents=new Map();const video={addEventListener:(name,fn)=>videoEvents.set(name,fn),removeEventListener:name=>videoEvents.delete(name)};
   let listener,attempts=0;const sent=[],shown=[],children=[],configured=[];
-  const player={append(host){children.push(host);host.isConnected=true;host.parentElement=player;}};
+  const player={querySelector:()=>video,append(host){children.push(host);host.isConnected=true;host.parentElement=player;}};
   const location={pathname:path,href:`https://www.youtube.com${path}?v=test`};
-  const context={Promise,location,DOMException,setTimeout:fn=>{fn();return 0;},clearTimeout(){},window:{addEventListener(){}},document:{documentElement:{},addEventListener(){},createElement(){return {style:{},remove(){this.isConnected=false;const i=children.indexOf(this);if(i>=0)children.splice(i,1);}};}},MutationObserver:class{observe(){}disconnect(){}},chrome:{runtime:{getURL:p=>p,onMessage:{addListener(fn){listener=fn;}},async sendMessage(m){sent.push(m);return m.type==='CONFIG'?(config?await config():{ok:true,settings:{}}):{ok:true};}}},modules:{'ui/composer-view.js':{},'youtube.js':{livePlayer:()=>location.pathname==='/watch'?player:null},'ui/captions.js':{mountCaptions(host){attempts++;if((failView&&attempts===1)||attempts<=failures)throw new Error('view failed');return {configure:value=>configured.push(value),show:cue=>shown.push(cue),clear(){},dispose(){host.remove();}};}}}};
+  const context={Promise,location,DOMException,setTimeout:fn=>{fn();return 0;},clearTimeout(){},window:{addEventListener(){}},document:{documentElement:{},addEventListener(){},createElement(){return {style:{},remove(){this.isConnected=false;const i=children.indexOf(this);if(i>=0)children.splice(i,1);}};}},MutationObserver:class{observe(){}disconnect(){}},chrome:{runtime:{getURL:p=>p,onMessage:{addListener(fn){listener=fn;}},async sendMessage(m){sent.push(m);return m.type==='CONFIG'?(config?await config():{ok:true,settings:{}}):{ok:true};}}},modules:{'ui/composer-view.js':{},'youtube.js':{watchPlayer:()=>location.pathname==='/watch'?player:null},'ui/captions.js':{mountCaptions(host){attempts++;if((failView&&attempts===1)||attempts<=failures)throw new Error('view failed');return {configure:value=>configured.push(value),show:cue=>shown.push(cue),clear(){},dispose(){host.remove();}};}}}};
   context.window.top=context.window;await vm.runInNewContext(source,context);
-  return {sent,shown,children,configured,location,notify:m=>listener(m,{},()=>{}),message:m=>new Promise(resolve=>listener(m,{},resolve))};
+  return {videoEvents,sent,shown,children,configured,location,notify:m=>listener(m,{},()=>{}),message:m=>new Promise(resolve=>listener(m,{},resolve))};
 }
 test('rejected config leaves no orphan and a later request recovers',async()=>{
   let n=0;const h=await harness({config:()=>++n===1?{ok:false}:{ok:true,settings:{}}});
@@ -43,9 +44,9 @@ test('timing broadcasts update the existing overlay without rebuilding or cleari
 });
 
 
-async function composerHarness(){
+async function composerHarness(path='/live_chat'){
   let listener,options,id=0,transportError=null,disconnected=0;const lost=[];const sent=[],timers=new Map(),replies=new Map();
-  const context={Promise,Map,DOMException,crypto:{randomUUID:()=>String(++id)},location:{pathname:'/live_chat',href:'https://www.youtube.com/live_chat?v=test'},setTimeout(fn,ms){timers.set(ms,fn);return ms;},clearTimeout(ms){timers.delete(ms);},window:{addEventListener(){}},document:{documentElement:{},addEventListener(){},querySelector:()=>({before(){}}),createElement:()=>({style:{},remove(){}})},MutationObserver:class{observe(){}disconnect(){disconnected++;}},chrome:{runtime:{getURL:p=>p,onMessage:{addListener(fn){listener=fn;}},sendMessage(m){sent.push(m);if(transportError)throw transportError;if(m.type==='TRANSLATE_COMMENT')return new Promise(r=>replies.set(m.id,r));return Promise.resolve(m.type==='CONFIG'?{ok:true,settings:{}}:{ok:true});}}},modules:{'ui/composer-view.js':{mountComposer(_host,o){options=o;return {captureStatus(){},connectionLost:message=>lost.push(message)};}},'ui/captions.js':{},'youtube.js':{}}};
+  const context={Promise,Map,DOMException,crypto:{randomUUID:()=>String(++id)},location:{pathname:path,href:`https://www.youtube.com${path}?v=test`},setTimeout(fn,ms){timers.set(ms,fn);return ms;},clearTimeout(ms){timers.delete(ms);},window:{addEventListener(){}},document:{documentElement:{},addEventListener(){},querySelector:()=>({before(){},append(){}}),createElement:()=>({style:{},remove(){}})},MutationObserver:class{observe(){}disconnect(){disconnected++;}},chrome:{runtime:{getURL:p=>p,onMessage:{addListener(fn){listener=fn;}},sendMessage(m){sent.push(m);if(transportError)throw transportError;if(m.type==='TRANSLATE_COMMENT')return new Promise(r=>replies.set(m.id,r));return Promise.resolve(m.type==='CONFIG'?{ok:true,settings:{}}:{ok:true});}}},modules:{'ui/composer-view.js':{mountComposer(_host,o){options=o;return {captureStatus(){},connectionLost:message=>lost.push(message)};}},'ui/captions.js':{},'youtube.js':{}}};
   await vm.runInNewContext(source,context);return {options,sent,timers,replies,lost,get disconnected(){return disconnected;},failTransport:error=>{transportError=error;},notify:m=>listener(m,{},()=>{})};
 }
 test('content routes matching batch progress and drops cancelled/finished progress',async()=>{
@@ -76,4 +77,20 @@ test('synchronous CANCEL failure cannot escape the abort listener or leave the b
   const pending=h.options.translateBatch({text:'keep draft',source:'en',target:'ja',backOnly:false,signal:controller.signal,onProgress(){}});
   h.failTransport(new Error('Extension context invalidated.'));controller.abort();
   await assert.rejects(pending,{name:'AbortError'});assert.equal(h.lost.length,1);assert.equal(h.timers.size,0);
+});
+
+test('seeking stops caption processing and suppresses old cues until restart',async()=>{
+ const h=await harness();h.videoEvents.get('seeking')();
+ assert.ok(h.sent.some(m=>m.type==='PLAYBACK_RESET'));
+ h.notify({type:'CAPTION',cue:{original:'old'}});await Promise.resolve();assert.equal(h.shown.length,0);
+ h.notify({type:'CAPTURE_STATUS',status:'STARTING'});
+ h.notify({type:'CAPTION',cue:{original:'new'}});await new Promise(resolve=>setImmediate(resolve));assert.equal(h.shown.at(-1).original,'new');
+ h.videoEvents.get('ended')();assert.equal(h.sent.filter(m=>m.type==='PLAYBACK_RESET').length,2);
+});
+
+test('chat replay mounts caption controls with no comment or insertion callbacks',async()=>{
+ const h=await composerHarness('/live_chat_replay');
+ assert.equal(h.options.captionsOnly,true);assert.equal(h.options.translateBatch,undefined);assert.equal(h.options.insert,undefined);
+ await h.options.captureAction('start');await h.options.captureAction('stop');await h.options.timingAction({captionDuration:10});
+ assert.ok(h.sent.some(m=>m.type==='PANEL_START'));assert.ok(h.sent.some(m=>m.type==='PANEL_STOP'));assert.ok(h.sent.some(m=>m.type==='PANEL_TIMING'));
 });

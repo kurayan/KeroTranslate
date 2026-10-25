@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Kero Translate - YouTube Live Translation & Comment Assist",
-  "version": "0.2.3",
-  "version_name": "0.2.3",
+  "version": "0.5.1",
+  "version_name": "0.5.1",
   "minimum_chrome_version": "116",
   "description": "EN / JA captions and comment drafting. INSERT never sends.",
   "permissions": [
